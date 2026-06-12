@@ -1,0 +1,33 @@
+{
+  "type": "record",
+  "name": "FraudAlert",
+  "namespace": "com.sentinel.fraud",
+  "doc": "High-risk transaction alert produced by Flink for agent investigation",
+  "fields": [
+    {"name": "alert_id",         "type": "string",  "doc": "UUID v4"},
+    {"name": "transaction_id",   "type": "string"},
+    {"name": "user_id",          "type": "string",
+     "confluent.field.meta": {"tags": ["PII"]}},
+    {"name": "amount",           "type": "double"},
+    {"name": "merchant_category","type": "string"},
+    {"name": "city",             "type": "string"},
+    {"name": "risk_score",       "type": "double"},
+    {"name": "alert_reasons",    "type": {"type": "array", "items": "string"},
+     "doc": "Triggered rule names e.g. VELOCITY_FRAUD, GEO_JUMP, AMOUNT_ANOMALY"},
+    {"name": "txn_count_5min",   "type": "int"},
+    {"name": "txn_sum_5min",     "type": "double"},
+    {"name": "geo_deviation_km", "type": "double"},
+    {"name": "amount_ratio",     "type": "double"},
+    {"name": "velocity_flag",    "type": "boolean"},
+    {"name": "geo_jump_flag",    "type": "boolean"},
+    {"name": "home_city",        "type": "string"},
+    {"name": "customer_risk_tier","type": "string"},
+    {"name": "account_age_days", "type": "int"},
+    {"name": "created_at",       "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "status",           "type": {
+      "type": "enum",
+      "name": "AlertStatus",
+      "symbols": ["PENDING", "INVESTIGATING", "RESOLVED", "FALSE_POSITIVE"]
+    }, "default": "PENDING"}
+  ]
+}

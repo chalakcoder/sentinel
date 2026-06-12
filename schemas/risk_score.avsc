@@ -1,0 +1,21 @@
+{
+  "type": "record",
+  "name": "RiskScore",
+  "namespace": "com.sentinel.fraud",
+  "doc": "ML model risk score output from Flink ML_PREDICT",
+  "fields": [
+    {"name": "transaction_id", "type": "string"},
+    {"name": "user_id",        "type": "string",
+     "confluent.field.meta": {"tags": ["PII"]}},
+    {"name": "risk_score",     "type": "double",  "doc": "Fraud probability 0.0-1.0"},
+    {"name": "risk_label",     "type": {
+      "type": "enum",
+      "name": "RiskLabel",
+      "symbols": ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
+    }},
+    {"name": "model_version",  "type": "string"},
+    {"name": "features_used",  "type": {"type": "map", "values": "double"},
+     "doc": "Feature values passed to ML model for auditability"},
+    {"name": "scored_at",      "type": {"type": "long", "logicalType": "timestamp-millis"}}
+  ]
+}

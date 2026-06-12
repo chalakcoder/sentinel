@@ -1,0 +1,149 @@
+version: '3.8'
+
+services:
+  broker:
+    image: confluentinc/cp-server:7.6.0
+    hostname: broker
+    container_name: broker
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker:9092
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@broker:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    ports:
+      - "9092:9092"
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.6.0
+    hostname: schema-registry
+    container_name: schema-registry
+    depends_on:
+      broker:
+        condition: service_healthy
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: broker:9092
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+    ports:
+      - "8081:8081"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/subjects"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongodb:
+    image: mongo:7.0
+    hostname: mongodb
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_DATABASE: sentinel
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  chromadb:
+    image: chromadb/chroma:latest
+    hostname: chromadb
+    container_name: chromadb
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  agent:
+    build:
+      context: .
+      dockerfile: agent/Dockerfile
+    container_name: sentinel-agent
+    depends_on:
+      broker:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      chromadb:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      - CONFLUENT_BOOTSTRAP_SERVERS=broker:9092
+      - CONFLUENT_SCHEMA_REGISTRY_URL=http://schema-registry:8081
+      - MONGODB_URI=mongodb://admin:password@mongodb:27017/
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    container_name: sentinel-api
+    depends_on:
+      broker:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      - CONFLUENT_BOOTSTRAP_SERVERS=broker:9092
+      - CONFLUENT_SCHEMA_REGISTRY_URL=http://schema-registry:8081
+      - MONGODB_URI=mongodb://admin:password@mongodb:27017/
+    ports:
+      - "8080:8080"
+
+  producer:
+    build:
+      context: .
+      dockerfile: producer/Dockerfile
+    container_name: sentinel-producer
+    depends_on:
+      broker:
+        condition: service_healthy
+      schema-registry:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      - CONFLUENT_BOOTSTRAP_SERVERS=broker:9092
+      - CONFLUENT_SCHEMA_REGISTRY_URL=http://schema-registry:8081
+
+  dashboard:
+    build:
+      context: dashboard
+      dockerfile: Dockerfile
+    container_name: sentinel-dashboard
+    depends_on:
+      - api
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:8080
+
+volumes:
+  mongo_data:
+  chroma_data:

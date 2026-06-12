@@ -1,0 +1,32 @@
+{
+  "type": "record",
+  "name": "CustomerProfile",
+  "namespace": "com.sentinel.fraud",
+  "doc": "Customer baseline profile for Flink temporal join enrichment",
+  "fields": [
+    {"name": "user_id",            "type": "string",
+     "confluent.field.meta": {"tags": ["PII", "GDPR"]}},
+    {"name": "name",               "type": "string",
+     "confluent.field.meta": {"tags": ["PII"]}},
+    {"name": "phone",              "type": "string",
+     "confluent.field.meta": {"tags": ["PII"]}},
+    {"name": "email",              "type": "string",
+     "confluent.field.meta": {"tags": ["PII"]}},
+    {"name": "home_city",          "type": "string"},
+    {"name": "home_latitude",      "type": "double",
+     "confluent.field.meta": {"tags": ["PII"]}},
+    {"name": "home_longitude",     "type": "double",
+     "confluent.field.meta": {"tags": ["PII"]}},
+    {"name": "avg_txn_amount",     "type": "double", "doc": "30-day average transaction amount INR"},
+    {"name": "std_txn_amount",     "type": "double", "doc": "Standard deviation of transaction amounts"},
+    {"name": "typical_merchants",  "type": {"type": "array", "items": "string"},
+     "doc": "Most frequently used merchant categories"},
+    {"name": "risk_tier",          "type": {
+      "type": "enum",
+      "name": "RiskTier",
+      "symbols": ["LOW", "MEDIUM", "HIGH"]
+    }, "default": "LOW"},
+    {"name": "account_age_days",   "type": "int"},
+    {"name": "updated_at",         "type": {"type": "long", "logicalType": "timestamp-millis"}}
+  ]
+}

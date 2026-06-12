@@ -1,0 +1,129 @@
+version: "1.0"
+description: "Sentinel fraud detection platform data contracts"
+
+contracts:
+  - topic: transactions
+    schema: transaction.avsc
+    compatibility: BACKWARD
+    owner: fraud-team@sentinel.io
+    sla:
+      freshness_minutes: 1
+      completeness_percent: 99.9
+    data_quality_rules:
+      - field: amount
+        rule: "value > 0"
+        action: DLQ
+        description: "Transaction amount must be positive"
+      - field: currency
+        rule: "value == 'INR'"
+        action: TAG
+        description: "Only INR transactions processed"
+      - field: merchant_category
+        rule: "value in VALID_ENUM_SYMBOLS"
+        action: DLQ
+        description: "Merchant category must be a known enum value"
+      - field: transaction_id
+        rule: "matches UUID_PATTERN"
+        action: LOG
+        description: "Transaction ID must be a valid UUID"
+    pii_fields:
+      - field: user_id
+        classification: PII
+        regulation: GDPR
+      - field: card_number
+        classification: PCI_DSS
+        masking: "show_last_4"
+      - field: latitude
+        classification: PII
+      - field: longitude
+        classification: PII
+      - field: ip_address
+        classification: PII
+    downstream_consumers:
+      - flink-feature-engineering
+      - flink-risk-scoring
+
+  - topic: customer-profiles
+    schema: customer_profile.avsc
+    compatibility: BACKWARD
+    owner: fraud-team@sentinel.io
+    sla:
+      freshness_minutes: 60
+      completeness_percent: 99.0
+    data_quality_rules:
+      - field: avg_txn_amount
+        rule: "value >= 0"
+        action: LOG
+      - field: account_age_days
+        rule: "value >= 0"
+        action: LOG
+    pii_fields:
+      - field: user_id
+        classification: PII
+        regulation: GDPR
+      - field: name
+        classification: PII
+      - field: phone
+        classification: PII
+      - field: email
+        classification: PII
+      - field: home_latitude
+        classification: PII
+      - field: home_longitude
+        classification: PII
+    downstream_consumers:
+      - flink-feature-engineering
+
+  - topic: enriched-transactions
+    schema: enriched_transaction.avsc
+    compatibility: BACKWARD
+    owner: fraud-team@sentinel.io
+    sla:
+      freshness_minutes: 1
+      completeness_percent: 99.0
+    downstream_consumers:
+      - flink-risk-scoring
+
+  - topic: risk-scores
+    schema: risk_score.avsc
+    compatibility: BACKWARD
+    owner: fraud-team@sentinel.io
+    sla:
+      freshness_minutes: 1
+      completeness_percent: 99.0
+    data_quality_rules:
+      - field: risk_score
+        rule: "value >= 0.0 AND value <= 1.0"
+        action: DLQ
+    downstream_consumers:
+      - flink-fraud-filter
+      - dashboard-api
+
+  - topic: fraud-alerts
+    schema: fraud_alert.avsc
+    compatibility: BACKWARD
+    owner: fraud-team@sentinel.io
+    sla:
+      freshness_minutes: 1
+      completeness_percent: 99.9
+    data_quality_rules:
+      - field: risk_score
+        rule: "value >= 0.7 AND value <= 1.0"
+        action: LOG
+        description: "Only high-risk transactions should be in fraud-alerts"
+    downstream_consumers:
+      - sentinel-agent
+      - dashboard-api
+      - mongodb-atlas-sink
+
+  - topic: agent-decisions
+    schema: agent_decision.avsc
+    compatibility: BACKWARD
+    owner: fraud-team@sentinel.io
+    sla:
+      freshness_minutes: 2
+      completeness_percent: 99.0
+    downstream_consumers:
+      - dashboard-api
+      - mongodb-atlas-sink
+      - audit-trail
