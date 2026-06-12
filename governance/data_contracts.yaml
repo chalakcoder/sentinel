@@ -112,18 +112,5 @@ contracts:
         action: LOG
         description: "Only high-risk transactions should be in fraud-alerts"
     downstream_consumers:
-      - sentinel-agent
       - dashboard-api
       - mongodb-atlas-sink
-
-  - topic: agent-decisions
-    schema: agent_decision.avsc
-    compatibility: BACKWARD
-    owner: fraud-team@sentinel.io
-    sla:
-      freshness_minutes: 2
-      completeness_percent: 99.0
-    downstream_consumers:
-      - dashboard-api
-      - mongodb-atlas-sink
-      - audit-trail

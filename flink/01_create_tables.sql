@@ -140,23 +140,6 @@ CREATE TABLE fraud_alerts (
 ) WITH (
     'connector'    = 'confluent',
     'kafka.topic'  = 'fraud-alerts',
-    'value.format' = 'json-registry'
+    'value.format' = 'avro-confluent'
 );
 
--- ── Sink: agent decisions ─────────────────────────────────────
-CREATE TABLE agent_decisions (
-    decision_id      STRING,
-    alert_id         STRING,
-    transaction_id   STRING,
-    user_id          STRING,
-    action           STRING,
-    confidence       DOUBLE,
-    reasoning        STRING,
-    latency_ms       BIGINT,
-    llm_model        STRING,
-    decided_at       TIMESTAMP(3)
-) WITH (
-    'connector'    = 'confluent',
-    'kafka.topic'  = 'agent-decisions',
-    'value.format' = 'json-registry'
-);

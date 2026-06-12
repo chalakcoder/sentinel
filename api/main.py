@@ -5,7 +5,6 @@ Endpoints:
   GET  /health                 → liveness probe
   WS   /ws/events              → real-time event stream for dashboard
   GET  /api/fraud-alerts       → recent fraud alerts from MongoDB
-  GET  /api/agent-decisions    → recent agent decisions from MongoDB
   GET  /api/metrics            → aggregated KPI metrics
 
 Run:
@@ -88,6 +87,7 @@ async def health() -> dict:
 
 @app.get("/api/fraud-alerts")
 async def get_fraud_alerts(limit: int = 20) -> dict:
+    """Recent fraud alerts — written to MongoDB by the Confluent MongoDB Atlas Sink connector."""
     db   = _get_db()
     docs = await (
         db.fraud_alerts
@@ -99,52 +99,23 @@ async def get_fraud_alerts(limit: int = 20) -> dict:
     return {"alerts": docs, "count": len(docs)}
 
 
-@app.get("/api/agent-decisions")
-async def get_agent_decisions(limit: int = 20) -> dict:
-    db   = _get_db()
-    docs = await (
-        db.agent_decisions
-        .find({}, {"_id": 0})
-        .sort("decided_at", -1)
-        .limit(limit)
-        .to_list(limit)
-    )
-    return {"decisions": docs, "count": len(docs)}
-
-
 @app.get("/api/metrics")
 async def get_metrics() -> dict:
     db = _get_db()
 
-    total_alerts   = await db.fraud_alerts.count_documents({})
-    total_decisions = await db.agent_decisions.count_documents({})
-    blocked        = await db.agent_decisions.count_documents({"action": "BLOCK"})
-    flagged        = await db.agent_decisions.count_documents({"action": "FLAG"})
-    approved       = await db.agent_decisions.count_documents({"action": "APPROVE"})
+    total_alerts    = await db.fraud_alerts.count_documents({})
+    critical_alerts = await db.fraud_alerts.count_documents({"risk_score": {"$gte": 0.9}})
+    velocity_alerts = await db.fraud_alerts.count_documents({"velocity_flag": True})
+    geo_jump_alerts = await db.fraud_alerts.count_documents({"geo_jump_flag": True})
 
-    pipeline = [{"$group": {"_id": None, "avg_latency": {"$avg": "$latency_ms"}}}]
-    lat_result = await db.agent_decisions.aggregate(pipeline).to_list(1)
-    avg_latency = round(lat_result[0]["avg_latency"], 0) if lat_result else 0
+    pipeline = [{"$group": {"_id": None, "avg_risk": {"$avg": "$risk_score"}}}]
+    avg_result = await db.fraud_alerts.aggregate(pipeline).to_list(1)
+    avg_risk   = round(avg_result[0]["avg_risk"], 3) if avg_result else 0
 
     return {
-        "total_alerts":     total_alerts,
-        "total_decisions":  total_decisions,
-        "blocked":          blocked,
-        "flagged":          flagged,
-        "approved":         approved,
-        "avg_latency_ms":   avg_latency,
-        "block_rate":       round(blocked / total_decisions, 3) if total_decisions else 0,
+        "total_alerts":    total_alerts,
+        "critical_alerts": critical_alerts,
+        "velocity_alerts": velocity_alerts,
+        "geo_jump_alerts": geo_jump_alerts,
+        "avg_risk_score":  avg_risk,
     }
-
-
-@app.get("/api/fraud-cases")
-async def get_fraud_cases(limit: int = 20) -> dict:
-    db   = _get_db()
-    docs = await (
-        db.fraud_cases
-        .find({}, {"_id": 0})
-        .sort("filed_at", -1)
-        .limit(limit)
-        .to_list(limit)
-    )
-    return {"cases": docs, "count": len(docs)}

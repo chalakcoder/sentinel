@@ -2,27 +2,32 @@
 Background Kafka consumer that bridges the blocking poll loop
 to async WebSocket broadcast queues via asyncio.run_coroutine_threadsafe.
 
+All pipeline topics carry Schema Registry Avro, so values are decoded with
+a generic AvroDeserializer (it resolves the writer schema from the message's
+schema ID). Plain-JSON messages fall back to json.loads.
+
 Topics consumed (all forwarded to connected dashboard clients):
   - transactions
   - risk-scores
   - fraud-alerts
-  - agent-decisions
 """
 import asyncio
 import json
 import logging
 import os
 from concurrent.futures import ThreadPoolExecutor
-from typing import TYPE_CHECKING
 
 from confluent_kafka import Consumer, KafkaError
+from confluent_kafka.schema_registry import SchemaRegistryClient
+from confluent_kafka.schema_registry.avro import AvroDeserializer
+from confluent_kafka.serialization import SerializationContext, MessageField
 
 logger = logging.getLogger(__name__)
 
 # Shared list of per-client queues; the WebSocket endpoint manages lifecycle
 BROADCAST_QUEUES: list[asyncio.Queue] = []
 
-TOPICS = ["transactions", "risk-scores", "fraud-alerts", "agent-decisions"]
+TOPICS = ["transactions", "risk-scores", "fraud-alerts"]
 
 
 def _build_consumer() -> Consumer:
@@ -43,9 +48,34 @@ def _build_consumer() -> Consumer:
     return Consumer(conf)
 
 
+def _build_avro_deserializer() -> AvroDeserializer:
+    sr_conf: dict = {"url": os.environ["CONFLUENT_SCHEMA_REGISTRY_URL"]}
+    sr_key = os.environ.get("CONFLUENT_SCHEMA_REGISTRY_API_KEY", "")
+    sr_sec = os.environ.get("CONFLUENT_SCHEMA_REGISTRY_API_SECRET", "")
+    if sr_key:
+        sr_conf["basic.auth.user.info"] = f"{sr_key}:{sr_sec}"
+    # No schema string: resolves the writer schema from each message's schema ID
+    return AvroDeserializer(SchemaRegistryClient(sr_conf))
+
+
+def _decode_value(raw: bytes, topic: str, avro_deserializer: AvroDeserializer):
+    try:
+        value = avro_deserializer(raw, SerializationContext(topic, MessageField.VALUE))
+        if value is not None:
+            # Round-trip through JSON to make datetimes/decimals WS-serializable
+            return json.loads(json.dumps(value, default=str))
+    except Exception:
+        pass
+    try:
+        return json.loads(raw.decode("utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return None
+
+
 def _poll_loop(loop: asyncio.AbstractEventLoop) -> None:
     """Blocking Kafka poll loop — runs in a ThreadPoolExecutor thread."""
     consumer = _build_consumer()
+    avro_deserializer = _build_avro_deserializer()
     consumer.subscribe(TOPICS)
     logger.info("Kafka dashboard consumer started, subscribed to %s", TOPICS)
 
@@ -58,27 +88,23 @@ def _poll_loop(loop: asyncio.AbstractEventLoop) -> None:
                 logger.error("Kafka consumer error: %s", msg.error())
             continue
 
-        try:
-            value_bytes = msg.value()
-            if value_bytes is None:
-                continue
-            value = json.loads(value_bytes.decode("utf-8"))
-            event = {
-                "topic":     msg.topic(),
-                "partition": msg.partition(),
-                "offset":    msg.offset(),
-                "key":       msg.key().decode("utf-8") if msg.key() else None,
-                "value":     value,
-            }
-            # Broadcast to all connected WebSocket clients
-            for queue in list(BROADCAST_QUEUES):
-                asyncio.run_coroutine_threadsafe(
-                    queue.put(event), loop
-                )
-        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-            logger.debug("Skipping non-JSON message: %s", exc)
-        except Exception as exc:
-            logger.error("Error processing Kafka message: %s", exc)
+        raw = msg.value()
+        if raw is None:
+            continue
+
+        value = _decode_value(raw, msg.topic(), avro_deserializer)
+        if value is None:
+            continue
+
+        event = {
+            "topic":     msg.topic(),
+            "partition": msg.partition(),
+            "offset":    msg.offset(),
+            "key":       msg.key().decode("utf-8") if msg.key() else None,
+            "value":     value,
+        }
+        for queue in list(BROADCAST_QUEUES):
+            asyncio.run_coroutine_threadsafe(queue.put(event), loop)
 
 
 _executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="kafka-consumer")

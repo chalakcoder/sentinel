@@ -1,12 +1,5 @@
 import React, { useState, useEffect } from 'react';
 
-const TILES = [
-  { key: 'total_alerts',   label: 'Fraud Alerts',           bg: 'bg-red-600' },
-  { key: 'blocked',        label: 'Transactions Blocked',   bg: 'bg-orange-500' },
-  { key: 'flagged',        label: 'Flagged for Review',     bg: 'bg-yellow-500' },
-  { key: 'avg_latency_ms', label: 'Avg Agent Latency (ms)', bg: 'bg-blue-600' },
-];
-
 export function MetricsBar({ events }) {
   const [metrics, setMetrics] = useState(null);
   const apiUrl = process.env.REACT_APP_API_URL || '';
@@ -23,15 +16,23 @@ export function MetricsBar({ events }) {
     return () => clearInterval(id);
   }, [apiUrl]);
 
-  // Supplement server metrics with live WebSocket counts while server data loads
+  // Live counts from the WebSocket stream
+  const txnsSeen   = events.filter(e => e.topic === 'risk-scores').length;
   const liveAlerts = events.filter(e => e.topic === 'fraud-alerts').length;
-  const data = metrics ?? { total_alerts: liveAlerts, blocked: 0, flagged: 0, avg_latency_ms: 0 };
+
+  const tiles = [
+    { value: txnsSeen,                                    label: 'Transactions Scored (live)', bg: 'bg-blue-600' },
+    { value: metrics?.total_alerts ?? liveAlerts,         label: 'Fraud Alerts',               bg: 'bg-red-600' },
+    { value: metrics?.critical_alerts ?? 0,               label: 'Critical (≥90%)',            bg: 'bg-orange-500' },
+    { value: metrics ? `${(metrics.avg_risk_score * 100).toFixed(0)}%` : '—',
+                                                          label: 'Avg Alert Risk',             bg: 'bg-yellow-500' },
+  ];
 
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-6">
-      {TILES.map(({ key, label, bg }) => (
-        <div key={key} className={`${bg} text-white rounded-xl p-4 shadow`}>
-          <div className="text-3xl font-bold tabular-nums">{data[key] ?? 0}</div>
+      {tiles.map(({ value, label, bg }, i) => (
+        <div key={i} className={`${bg} text-white rounded-xl p-4 shadow`}>
+          <div className="text-3xl font-bold tabular-nums">{value}</div>
           <div className="text-sm opacity-80 mt-1">{label}</div>
         </div>
       ))}

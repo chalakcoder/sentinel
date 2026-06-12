@@ -1,7 +1,7 @@
 import React from 'react';
 import { MetricsBar }      from './components/MetricsBar';
 import { TransactionFeed } from './components/TransactionFeed';
-import { AgentActionLog }  from './components/AgentActionLog';
+import { FraudAlertLog }   from './components/FraudAlertLog';
 import { RiskScoreChart }  from './components/RiskScoreChart';
 import { useWebSocket }    from './hooks/useWebSocket';
 
@@ -16,11 +16,11 @@ const STATUS_COLOR = {
 };
 
 const ARCH_STEPS = [
-  'Confluent Kafka',
-  'Flink SQL + ML_PREDICT',
+  'UPI Transactions',
+  'Confluent Kafka + Schema Registry',
+  'Flink SQL (windows + joins + scoring)',
   'fraud-alerts',
-  'LangGraph + IBM WatsonX',
-  'MongoDB Atlas',
+  'MongoDB Atlas Sink Connector',
   'This Dashboard',
 ];
 
@@ -36,7 +36,7 @@ export default function App() {
           <div>
             <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Sentinel</h1>
             <p className="text-gray-500 text-sm mt-0.5">
-              Real-Time Fraud &amp; Anomaly Triage Agent · Confluent AI Day India 2025
+              Real-Time Fraud Detection · Confluent AI Day India 2025
             </p>
           </div>
           <div className="flex items-center gap-2 mt-1">
@@ -51,10 +51,10 @@ export default function App() {
         {/* ── Risk score stream ───────────────────────────────── */}
         <RiskScoreChart events={events} />
 
-        {/* ── Transaction feed + Agent decisions ─────────────── */}
+        {/* ── Transaction feed + Fraud alerts ─────────────────── */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 mb-6">
           <TransactionFeed events={events} />
-          <AgentActionLog  events={events} />
+          <FraudAlertLog   events={events} />
         </div>
 
         {/* ── Architecture diagram ────────────────────────────── */}
@@ -73,10 +73,9 @@ export default function App() {
             ))}
           </div>
           <p className="mt-3 text-xs text-gray-400">
-            UPI / card transactions → Kafka → Flink feature engineering + ML_PREDICT →
-            LangGraph agent (IBM WatsonX granite-13b) investigates, blocks, notifies →
-            MongoDB Atlas (via Confluent connector) → live dashboard.
-            Fraud caught in &lt;2 seconds.
+            UPI / card transactions → Kafka (Avro + governed schemas) → Flink SQL feature
+            engineering and risk scoring → fraud alerts sunk to MongoDB Atlas via Confluent
+            managed connector → live dashboard. Fraud caught in &lt;2 seconds.
           </p>
         </div>
 

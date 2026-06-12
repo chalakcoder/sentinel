@@ -65,40 +65,6 @@ services:
       timeout: 5s
       retries: 5
 
-  chromadb:
-    image: chromadb/chroma:latest
-    hostname: chromadb
-    container_name: chromadb
-    ports:
-      - "8000:8000"
-    volumes:
-      - chroma_data:/chroma/chroma
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  agent:
-    build:
-      context: .
-      dockerfile: agent/Dockerfile
-    container_name: sentinel-agent
-    depends_on:
-      broker:
-        condition: service_healthy
-      mongodb:
-        condition: service_healthy
-      chromadb:
-        condition: service_healthy
-    env_file: .env
-    environment:
-      - CONFLUENT_BOOTSTRAP_SERVERS=broker:9092
-      - CONFLUENT_SCHEMA_REGISTRY_URL=http://schema-registry:8081
-      - MONGODB_URI=mongodb://admin:password@mongodb:27017/
-      - CHROMA_HOST=chromadb
-      - CHROMA_PORT=8000
-
   api:
     build:
       context: .
@@ -146,4 +112,3 @@ services:
 
 volumes:
   mongo_data:
-  chroma_data:
