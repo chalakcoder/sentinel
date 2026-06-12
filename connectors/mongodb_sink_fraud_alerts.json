@@ -1,0 +1,17 @@
+{
+  "name": "mongodb-sink-fraud-alerts",
+  "connector.class": "MongoDbAtlasSink",
+  "kafka.auth.mode": "KAFKA_API_KEY",
+  "kafka.api.key": "<CONFLUENT_API_KEY>",
+  "kafka.api.secret": "<CONFLUENT_API_SECRET>",
+  "input.data.format": "AVRO",
+  "topics": "fraud-alerts",
+  "connection.host": "<your-cluster>.mongodb.net",
+  "connection.user": "<MONGODB_USER>",
+  "connection.password": "<MONGODB_PASSWORD>",
+  "database": "sentinel",
+  "collection": "fraud_alerts",
+  "max.num.retries": "3",
+  "retries.defer.timeout": "5000",
+  "tasks.max": "1"
+}
