@@ -1,19 +1,14 @@
 # Sentinel — Real-Time UPI Fraud Detection on Confluent
 
-> **Confluent AI Day India 2025 · June 25, Taj MG Road, Bengaluru**
->
 > Catches UPI/card fraud in **< 2 seconds** instead of next-day batch review.
-> Built with **IBM Bob** as the AI pair-programmer (mention this in the pitch — judges look for it).
 
-Targets the **1st prize rubric**: business impact using **Confluent Connectors + Stream Processing + Governance**.
+Built on **Confluent Connectors + Stream Processing + Governance**.
 
-| Rubric checkbox | How Sentinel covers it |
-|-----------------|------------------------|
-| **Connectors** | Fully managed **MongoDB Atlas Sink** (MongoDB is a platinum sponsor) sinks `fraud-alerts` into Atlas for case management and dashboard queries |
+| Capability | How Sentinel uses it |
+|------------|----------------------|
+| **Connectors** | Fully managed **MongoDB Atlas Sink** sinks `fraud-alerts` into Atlas for case management and dashboard queries |
 | **Stream Processing** | Flink SQL: rolling OVER windows (5-min / 1-hour per card), temporal table join with customer profiles, Haversine geo-deviation, weighted risk scoring, alert filtering — 4 SQL jobs |
 | **Governance** | 5 Avro schemas in Schema Registry with BACKWARD compatibility, field-level **PII / PCI_DSS / GDPR tags** via the Confluent Tags API, and data contracts with quality rules and SLAs |
-
-**Business pitch**: UPI fraud costs India **₹1,500+ crore/year** (RBI). Sentinel cuts detection from next-day batch review to **under 2 seconds**, blocking fraud before money leaves the account.
 
 ---
 
@@ -59,7 +54,6 @@ FastAPI WebSocket ──► React Dashboard (live feed, alerts, KPIs)
 - **Confluent Cloud** account — free signup with credits: [confluent.cloud](https://confluent.cloud)
 - **MongoDB Atlas** account — free M0 cluster: [cloud.mongodb.com](https://cloud.mongodb.com)
 - **Python 3.11+** and **Node 20+** locally
-- **IBM Bob** — use it while building/extending this project; cite it in your pitch
 
 ### 1. Confluent Cloud: cluster + Flink
 
@@ -101,7 +95,7 @@ This registers the producer-owned Avro schemas (`transactions`, `customer-profil
 
 The three downstream subjects (`enriched-transactions`, `risk-scores`, `fraud-alerts`) are auto-registered by Flink when the SQL jobs start — **re-run this script after step 8** to tag those too (the script tells you which subjects it skipped).
 
-**Verify**: Confluent Cloud → Environment → Schema Registry → open `transactions-value` → fields show PII tags. Also show `governance/data_contracts.yaml` (data quality rules + SLAs) in your demo.
+**Verify**: Confluent Cloud → Environment → Schema Registry → open `transactions-value` → fields show PII tags. See `governance/data_contracts.yaml` for the data quality rules and SLAs.
 
 ### 5. MongoDB Atlas
 
@@ -182,15 +176,6 @@ Open **http://localhost:3000**:
 
 ---
 
-## Demo script (3 minutes)
-
-1. **The problem** (20s): "UPI fraud costs ₹1,500+ crore a year and most banks catch it in next-day batch review. Sentinel catches it in under 2 seconds."
-2. **Live demo** (90s): dashboard on screen → point out normal green traffic → fraud injection fires → red alert appears with reason chips → show the same alert landing in MongoDB Atlas via the managed connector.
-3. **The Confluent story** (40s): Schema Registry with PII tags (governance), Flink SQL workspace with the running window/join/scoring jobs (stream processing), connector status page (connectors).
-4. **Close** (30s): business impact numbers + "built with IBM Bob".
-
----
-
 ## Project structure
 
 ```
@@ -203,5 +188,3 @@ sentinel/
 ├── api/              # FastAPI + WebSocket bridge (Kafka → dashboard)
 └── dashboard/        # React live dashboard
 ```
-
-> The earlier AI-agent build (LangGraph + IBM watsonx + ML_PREDICT, targeting the 2nd/3rd prize rubrics) was removed to keep this setup focused; it's recoverable from git history (`git log`) if you want to add it back.

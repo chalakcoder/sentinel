@@ -36,7 +36,7 @@ export default function App() {
           <div>
             <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Sentinel</h1>
             <p className="text-gray-500 text-sm mt-0.5">
-              Real-Time Fraud Detection · Confluent AI Day India 2025
+              Real-Time UPI Fraud Detection on Confluent
             </p>
           </div>
           <div className="flex items-center gap-2 mt-1">
